@@ -1,0 +1,279 @@
+四角阴影
+
+
+
+
+
+
+import cv2 as cv
+import numpy as np
+
+
+
+img1=cv.imread("D:/opencv/testimage1.png")
+print(img1.shape)
+img2=np.zeros([img1.shape[0],img1.shape[1],img1.shape[2]],np.uint8)
+for i in range(img1.shape[0]):
+    for j in range(img1.shape[1]):
+        img2[i,j,:]=0.3*abs(i-255)+0.3*abs(j-420)
+cv.imshow("grey",img2)
+img3=cv.subtract(img1,img2)
+cv.imshow("test",img3)
+cv.imwrite("D:/opencv/gradual.png",img3)
+cv.waitKey(0)
+cv.destroyAllWindows()
+
+
+
+------------------------------------------------------------------
+
+马赛克
+
+
+import cv2 as cv
+import numpy as np
+
+img1=cv.imread("D:/opencv/test.jpg")
+cv.imshow("origin",img1)
+print("picture width"+str(img1.shape[1]))
+print("picture height"+str(img1.shape[0]))
+x=int(input("x position:"))
+y=int(input("y position:"))
+width=int(input("width:"))
+height=int(input("height:"))
+size=int(input("cell size"))
+if x+width>img1.shape[1] or y+height>img1.shape[0] or size>50:
+    print("wrong size")
+
+else:
+    for i in range(int(y/size),int((y+height)/size)):
+        for j in range(int(x/size),int((x+width)/size)):
+            img1[size*i:size*i+size,size*j:size*j+size]=img1[size*i,size*j]
+    cv.imshow("m",img1)
+    cv.waitKey(0)
+    cv.destroyAllWindows()
+
+
+-------------------------------------------------------------------
+
+摘取蓝色部分
+
+
+
+import cv2 as cv
+import numpy as np
+
+
+vid=cv.VideoCapture("D:/opencv/test_video.mp4")
+while(True):
+    ret,frame=vid.read()
+    if ret==False:
+        break
+    hsv=cv.cvtColor(frame,cv.COLOR_BGR2HSV)
+    lower=np.array([100,43,46])
+    upper=np.array([124,255,255])
+    mask=cv.inRange(hsv,lower,upper)
+    blue=cv.bitwise_and(frame,frame,mask=mask)
+    cv.imshow("blue",blue)
+    cv.imshow("origin",frame)
+    c=cv.waitKey(20)
+    if c==27:
+        break
+cv.destroyAllWindows()
+
+
+
+——————————————————————————————————
+不同模糊程度图像输出
+
+
+import cv2 as cv
+import numpy as np
+
+img=cv.imread("D:/opencv/testimage1.png")
+cv.imshow("origin",img)
+for i in range(1,11,1):
+    blur=cv.GaussianBlur(img,(2*i+1,2*i+1),0)
+    name="blur"+str(i)
+    cv.imshow(name,blur)
+
+cv.waitKey(0)
+cv.destroyAllWindows()
+
+---------------------------------------------------------------
+
+直方图
+
+
+import cv2 as cv
+import numpy as np
+from matplotlib import pyplot
+
+img=cv.imread("D:/opencv/testimage1.png")
+cv.imshow("origin",img)
+color=("blue","green","red")
+for i in range(3):
+    hist=cv.calcHist([img],[i],None,[256],[0,256])
+    pyplot.plot(hist,color[i])
+    pyplot.xlim([0,256])
+pyplot.show()
+
+cv.waitKey(0)
+cv.destroyAllWindows()
+
+
+-------------------------------------------------------------
+反向投影找目标
+
+import cv2 as cv
+import numpy as np
+
+
+img=cv.imread("D:/opencv/test.png")
+sample1=cv.imread("D:/opencv/samp1.png")
+sample2=cv.imread("D:/opencv/samp2.png")
+sample3=cv.imread("D:/opencv/samp3.png")
+print(img.shape)
+hsv=cv.cvtColor(img,cv.COLOR_BGR2HSV)
+s_hsv=cv.cvtColor(sample2,cv.COLOR_BGR2HSV)
+
+
+s_hist=cv.calcHist([s_hsv],[0,1],None,[20,20],[0,180,0,256])
+cv.normalize(s_hist,s_hist,0,255,cv.NORM_MINMAX)
+result=cv.calcBackProject([hsv],[0,1],s_hist,[0,180,0,256],1)   
+cv.imshow("result",result)
+
+result1=cv.inRange(result,30,255)
+tower=cv.bitwise_and(img,img,mask=result1)
+cv.imshow("tower",tower)
+cv.imwrite("D:/opencv/tower.png",tower)
+
+cv.waitKey(0)
+cv.destroyAllWindows()
+
+
+__________________________________________________________________
+识别线并决定转向
+
+import cv2 as cv
+import numpy as np
+
+
+video=cv.VideoCapture("D:/opencv/resource/line_move.mp4")
+while(True):
+    ret,img=video.read()
+    if ret==0:
+        break
+
+    can=cv.Canny(img,100,200)
+    lines=cv.HoughLinesP(can,1,np.pi/180,100,20,10)
+    
+    n=0
+    ks=0
+    ys=0
+    for line in lines:
+        x1,y1,x2,y2=line[0]
+        cv.line(img,(x1,y1),(x2,y2),(0,0,255),5)
+        n=n+1
+        ks=ks+((y1-y2)/(x2-x1))
+        ys=ys+y1
+    h,w=img.shape[:2]
+    cv.imshow("result",img)
+    k=ks/n
+    theta=np.arctan(k)*57.3
+    place=-ys/n+img.shape[0]/2
+    if k>0:
+        turn="turn left"
+    else:
+        turn="turn right"
+
+    if place>0:
+        move="move left"
+    else:
+        move="move right"
+
+    print(turn+"     "+move)
+
+    c=cv.waitKey(200)
+    if c==27:
+        break
+    
+cv.destroyAllWindows()
+
+————————————————————————————————————
+跟踪圆并保存
+
+import cv2 as cv
+import numpy as np
+
+
+video=cv.VideoCapture("D:/opencv/resource/circle_move.mp4")
+size=(int(video.get(cv.CAP_PROP_FRAME_WIDTH)),int(video.get(cv.CAP_PROP_FRAME_HEIGHT)))
+vw=cv.VideoWriter("D:/opencv/results/circlemove.avi",cv.VideoWriter_fourcc('I','4','2','0'),20,size)
+i=0
+while (True):
+    ret,img=video.read()
+    
+    if ret==0:
+        break
+
+    if i==0:
+        fil=cv.pyrMeanShiftFiltering(img,20,30)
+        gray=cv.cvtColor(fil,cv.COLOR_BGR2GRAY)
+    
+        cir=cv.HoughCircles(gray,cv.HOUGH_GRADIENT,1,20,param1=100,param2=30,minRadius=0,maxRadius=0)    
+        cir=np.uint16(np.around(cir))
+    
+        c=cir[0,0]
+        print(c)
+        x=c[0]
+        y=c[1]
+        r=c[2]
+        text="x position: "+str(x)+"    y position: "+str(y)
+        
+
+    cv.circle(img,(x,y),r,(255,0,0),5)
+    cv.circle(img,(x,y),3,(255,0,0),3)
+    cv.putText(img,text,(40,40),cv.FONT_HERSHEY_SIMPLEX,1,255,3)    
+    cv.imshow("result",img)
+    vw.write(img)
+    key=cv.waitKey(1)
+    if key==27:
+        break
+cv.destroyAllWindows()
+
+——————————————————————————————————————————
+膨胀腐蚀、发现轮廓
+
+
+import cv2 as cv
+import numpy as np
+
+
+
+img=cv.imread("D:/opencv/resource/circle.png")
+gray=cv.cvtColor(img,cv.COLOR_BGR2GRAY)
+bina=cv.adaptiveThreshold(gray,255,cv.ADAPTIVE_THRESH_MEAN_C,cv.THRESH_BINARY,25,10)
+cv.imshow("binary",bina)
+k1=cv.getStructuringElement(cv.MORPH_RECT,(40,40))
+ero=cv.erode(bina,k1)
+cv.imshow("ero",ero)
+k2=cv.getStructuringElement(cv.MORPH_RECT,(50,50))
+dil=cv.dilate(ero,k2)
+cv.imshow("dil",dil)
+imgin=cv.bitwise_not(dil)
+out,con,hir=cv.findContours(imgin,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE)
+print(con)
+for i,contour in enumerate(con):
+    area=cv.contourArea(contour)
+    x,y,w,h=cv.boundingRect(contour)
+    print(x,y,h,w)
+    
+    m=cv.moments(contour)
+    cx=m['m10']/(m['m00']+0.001)
+    cy=m['m01']/(m['m00']+0.001)
+    
+    cv.rectangle(img,(x,y),(x+w,y+h),(0,255,0),2)
+    cv.circle(img,(np.int(cx),np.int(cy)),3,(0,255,255),-1)
+cv.imshow("result",img)
+cv.imwrite("D:/opencv/results/coin_find.png",img)
