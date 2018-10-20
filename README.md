@@ -1,1 +1,398 @@
-# opencv-test-code
+摘取蓝色部分
+
+
+
+import cv2 as cv
+import numpy as np
+
+
+vid=cv.VideoCapture("D:/opencv/test_video.mp4")
+while(True):
+    ret,frame=vid.read()
+    if ret==False:
+        break
+    hsv=cv.cvtColor(frame,cv.COLOR_BGR2HSV)
+    lower=np.array([100,43,46])
+    upper=np.array([124,255,255])
+    mask=cv.inRange(hsv,lower,upper)
+    blue=cv.bitwise_and(frame,frame,mask=mask)
+    cv.imshow("blue",blue)
+    cv.imshow("origin",frame)
+    c=cv.waitKey(20)
+    if c==27:
+        break
+cv.destroyAllWindows()
+
+反向投影找目标
+
+import cv2 as cv
+import numpy as np
+
+
+img=cv.imread("D:/opencv/test.png")
+sample1=cv.imread("D:/opencv/samp1.png")
+sample2=cv.imread("D:/opencv/samp2.png")
+sample3=cv.imread("D:/opencv/samp3.png")
+print(img.shape)
+hsv=cv.cvtColor(img,cv.COLOR_BGR2HSV)
+s_hsv=cv.cvtColor(sample2,cv.COLOR_BGR2HSV)
+
+
+s_hist=cv.calcHist([s_hsv],[0,1],None,[20,20],[0,180,0,256])
+cv.normalize(s_hist,s_hist,0,255,cv.NORM_MINMAX)
+result=cv.calcBackProject([hsv],[0,1],s_hist,[0,180,0,256],1)   
+cv.imshow("result",result)
+
+result1=cv.inRange(result,30,255)
+tower=cv.bitwise_and(img,img,mask=result1)
+cv.imshow("tower",tower)
+cv.imwrite("D:/opencv/tower.png",tower)
+
+cv.waitKey(0)
+cv.destroyAllWindows()
+
+
+__________________________________________________________________
+识别线并决定转向
+
+import cv2 as cv
+import numpy as np
+
+
+video=cv.VideoCapture("D:/opencv/resource/line_move.mp4")
+while(True):
+    ret,img=video.read()
+    if ret==0:
+        break
+
+    can=cv.Canny(img,100,200)
+    lines=cv.HoughLinesP(can,1,np.pi/180,100,20,10)
+    
+    n=0
+    ks=0
+    ys=0
+    for line in lines:
+        x1,y1,x2,y2=line[0]
+        cv.line(img,(x1,y1),(x2,y2),(0,0,255),5)
+        n=n+1
+        ks=ks+((y1-y2)/(x2-x1))
+        ys=ys+y1
+    h,w=img.shape[:2]
+    cv.imshow("result",img)
+    k=ks/n
+    theta=np.arctan(k)*57.3
+    place=-ys/n+img.shape[0]/2
+    if k>0:
+        turn="turn left"
+    else:
+        turn="turn right"
+
+    if place>0:
+        move="move left"
+    else:
+        move="move right"
+
+    print(turn+"     "+move)
+
+    c=cv.waitKey(200)
+    if c==27:
+        break
+    
+cv.destroyAllWindows()
+
+————————————————————————————————————
+跟踪圆并保存
+
+import cv2 as cv
+import numpy as np
+
+
+video=cv.VideoCapture("D:/opencv/resource/circle_move.mp4")
+size=(int(video.get(cv.CAP_PROP_FRAME_WIDTH)),int(video.get(cv.CAP_PROP_FRAME_HEIGHT)))
+vw=cv.VideoWriter("D:/opencv/results/circlemove.avi",cv.VideoWriter_fourcc('I','4','2','0'),20,size)
+i=0
+while (True):
+    ret,img=video.read()
+    
+    if ret==0:
+        break
+
+    if i==0:
+        fil=cv.pyrMeanShiftFiltering(img,20,30)
+        gray=cv.cvtColor(fil,cv.COLOR_BGR2GRAY)
+    
+        cir=cv.HoughCircles(gray,cv.HOUGH_GRADIENT,1,20,param1=100,param2=30,minRadius=0,maxRadius=0)    
+        cir=np.uint16(np.around(cir))
+    
+        c=cir[0,0]
+        print(c)
+        x=c[0]
+        y=c[1]
+        r=c[2]
+        text="x position: "+str(x)+"    y position: "+str(y)
+        
+
+    cv.circle(img,(x,y),r,(255,0,0),5)
+    cv.circle(img,(x,y),3,(255,0,0),3)
+    cv.putText(img,text,(40,40),cv.FONT_HERSHEY_SIMPLEX,1,255,3)    
+    cv.imshow("result",img)
+    vw.write(img)
+    key=cv.waitKey(1)
+    if key==27:
+        break
+cv.destroyAllWindows()
+
+——————————————————————————————————————————
+膨胀腐蚀、发现轮廓
+
+
+import cv2 as cv
+import numpy as np
+
+
+
+img=cv.imread("D:/opencv/resource/circle.png")
+gray=cv.cvtColor(img,cv.COLOR_BGR2GRAY)
+bina=cv.adaptiveThreshold(gray,255,cv.ADAPTIVE_THRESH_MEAN_C,cv.THRESH_BINARY,25,10)
+cv.imshow("binary",bina)
+k1=cv.getStructuringElement(cv.MORPH_RECT,(40,40))
+ero=cv.erode(bina,k1)
+cv.imshow("ero",ero)
+k2=cv.getStructuringElement(cv.MORPH_RECT,(50,50))
+dil=cv.dilate(ero,k2)
+cv.imshow("dil",dil)
+imgin=cv.bitwise_not(dil)
+out,con,hir=cv.findContours(imgin,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE)
+print(con)
+for i,contour in enumerate(con):
+    area=cv.contourArea(contour)
+    x,y,w,h=cv.boundingRect(contour)
+    print(x,y,h,w)
+    
+    m=cv.moments(contour)
+    cx=m['m10']/(m['m00']+0.001)
+    cy=m['m01']/(m['m00']+0.001)
+    
+    cv.rectangle(img,(x,y),(x+w,y+h),(0,255,0),2)
+    cv.circle(img,(np.int(cx),np.int(cy)),3,(0,255,0),-1)
+cv.imshow("result",img)
+cv.imwrite("D:/opencv/results/coin_find.png",img)
+
+————————————————————————————————————————————
+找西红柿
+
+import cv2 as cv
+import numpy as np
+
+
+img=cv.imread("D:/opencv/resource/tomato2.png")
+
+print(img.shape)
+res=cv.subtract(img[:,:,2],img[:,:,1])
+cv.imshow("res",res)
+
+
+ret,bina=cv.threshold(res,0,255,cv.THRESH_BINARY|cv.THRESH_OTSU)
+cv.imshow("bina",bina)
+
+
+k=cv.getStructuringElement(cv.MORPH_RECT,(15,15))
+bina=cv.morphologyEx(bina,cv.MORPH_OPEN,k)
+cv.imshow("open",bina)
+
+out,con,hir=cv.findContours(bina,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE)
+print(con)
+for i,contour in enumerate(con):
+    area=cv.contourArea(contour)
+    x,y,w,h=cv.boundingRect(contour)
+    print(x,y,h,w)
+    
+    m=cv.moments(contour)
+    cx=m['m10']/(m['m00']+0.001)
+    cy=m['m01']/(m['m00']+0.001)
+    
+    cv.rectangle(img,(x,y),(x+w,y+h),(0,255,0),2)
+    cv.circle(img,(np.int(cx),np.int(cy)),3,(0,255,0),-1)
+cv.imshow("result",img)
+cv.imwrite("D:/opencv/results/tomatos_found2.png",img)
+
+cv.waitKey(0)
+cv.destroyAllWindows()
+————————————————————————————————————————————————
+看电脑距离提醒
+
+import cv2 as cv
+import numpy as np
+
+video=cv.VideoCapture(0)
+det=cv.CascadeClassifier("D:/opencv/xmls/haarcascade_frontalface_default.xml")
+while(True):
+    ret,img=video.read()
+    img=cv.flip(img,1)
+    if_show=False
+    if ret==0:
+        break
+    gray=cv.cvtColor(img,cv.COLOR_BGR2GRAY)
+
+    faces=det.detectMultiScale(gray,1.2,5)
+    
+    for x,y,w,h in faces:
+        cv.rectangle(img,(x,y),(x+w,y+h),(0,0,255),5)
+        if w>250:
+            print(w)
+            if_show=True
+            text="get further from the screen!"
+            cv.putText(img,text,(x,y-40),cv.FONT_HERSHEY_SIMPLEX,1,(0,0,255),3)
+            break
+    if if_show==True:
+        cv.imshow("result",img)
+    key=cv.waitKey(5)
+    if key==27:
+        break
+
+video.release()
+cv.destroyAllWindows()
+
+————————————————————————————————————————————
+分类器训练（未成功）
+import cv2 as cv
+import numpy as np
+import matplotlib.pyplot
+
+pos_num=10
+neg_num=10
+
+wsize=(1280,720)
+bsize=(16,16)
+bstride=(8,8)
+csize=(8,8)
+nbin=9
+
+hog=cv.HOGDescriptor(wsize,bsize,bstride,csize,nbin)
+svm=cv.ml.SVM_create()
+
+f_num=int(((1280-16)/8+1)*((720-16)/8+1)*4*9)
+print(f_num)
+
+f_array=np.zeros(((pos_num+neg_num),f_num),np.float32)
+l_array=np.zeros(((pos_num+neg_num),1),np.int32)
+
+for i in range(pos_num):
+    name="D:/opencv/samps/pos/pos"+str(i+1)+".jpg"
+    img=cv.imread(name)
+    #print(img.shape)
+    hist=hog.compute(img,(8,8))
+    for j in range(0,f_num):
+        f_array[i,j]=hist[j]
+    l_array[i,0]=1
+    print(str(i)+"done")
+print("positive done")
+
+
+for i in range(neg_num):
+    name="D:/opencv/samps/neg/neg"+str(i+1)+".jpg"
+    img=cv.imread(name)
+    hist=hog.compute(img,(8,8))
+    for j in range(0,f_num):
+        f_array[i,j]=hist[j]
+    l_array[i,0]=-1
+    print(str(i)+"done")
+print("negative done")
+
+
+svm.setType(cv.ml.SVM_C_SVC)
+svm.setKernel(cv.ml.SVM_LINEAR)
+svm.setC(0.01)
+
+ret=svm.train(f_array,cv.ml.ROW_SAMPLE,l_array)
+
+a=np.zeros((1),np.float32)
+rho=svm.getDecisionFunction(0,a)
+print("rho"+str(rho))
+print("a"+str(a))
+a_array=np.zeros((1,1),np.float32)
+sv_array=np.zeros((1,f_num),np.float32)
+a_array[0,0]=a
+result_array=-1*a_array*sv_array
+print("result"+str(result_array))
+
+
+my_det=np.zeros((f_num+1),np.float32)
+for i in range(0,f_num):
+    my_det[i]=result_array[0,i]
+my_det[f_num]=rho[0]
+print(my_det)
+my_hog=cv.HOGDescriptor()
+my_hog.setSVMDetector(my_det)
+
+————————————————————————————————————————————————————
+基于角点检测方块
+
+import cv2 as cv
+import numpy as np
+
+vid=cv.VideoCapture("D:/opencv/resource/paper.mp4")
+while(True):
+    ret,img=vid.read()
+    if ret==0:
+        break
+        
+    gray=cv.cvtColor(img,cv.COLOR_BGR2GRAY)
+    gray=cv.GaussianBlur(gray,(0,0),5)
+    gray=np.float32(gray)
+
+    cor=cv.goodFeaturesToTrack(gray,6,0.01,10)
+    xs=[0,0,0,0,0,0]
+    ys=[0,0,0,0,0,0]
+    lable=0
+
+    for c in cor:
+    
+        x,y=c.ravel()
+        xs[lable]=x
+        ys[lable]=y
+        lable+=1
+        #print("x=",x,"y=",y)
+    
+    cv.rectangle(img,(min(xs),min(ys)),(max(xs),max(ys)),(0,0,255),5)
+    cv.imshow("corners",img)
+    k=cv.waitKey(1)
+    if k==27:
+        break
+cv.destroyAllWindows()
+
+——————————————————————————————————
+运动目标检测
+
+import cv2 as cv
+import numpy as np
+
+vid=cv.VideoCapture(0)
+bs=cv.createBackgroundSubtractorKNN(detectShadows=True)
+
+while(True):
+    ret,frame=vid.read()
+    fgmask=bs.apply(frame)
+    ret,bina=cv.threshold(fgmask,0,255,cv.THRESH_BINARY|cv.THRESH_OTSU)
+    cv.imshow("bina",bina)
+
+    k1=cv.getStructuringElement(cv.MORPH_RECT,(20,20))
+    k2=cv.getStructuringElement(cv.MORPH_RECT,(20,20))
+    bina=cv.morphologyEx(bina,cv.MORPH_CLOSE,k1)
+    #bina=cv.morphologyEx(bina,cv.MORPH_OPEN,k2)
+    cv.imshow("processed",bina)
+    
+    out,con,hir=cv.findContours(bina,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE)
+    for contour in con:
+        if cv.contourArea(contour)>1600:
+            (x,y,w,h)=cv.boundingRect(contour)
+            cv.rectangle(frame,(x,y),(x+w,y+h),(0,255,0),2)
+    cv.imshow("frame",frame)
+    k=cv.waitKey(1)
+    if k==27:
+        break
+
+
+vid.release()
+
+cv.destroyAllWindows()
