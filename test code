@@ -1,61 +1,3 @@
-四角阴影
-
-
-
-
-
-
-import cv2 as cv
-import numpy as np
-
-
-
-img1=cv.imread("D:/opencv/testimage1.png")
-print(img1.shape)
-img2=np.zeros([img1.shape[0],img1.shape[1],img1.shape[2]],np.uint8)
-for i in range(img1.shape[0]):
-    for j in range(img1.shape[1]):
-        img2[i,j,:]=0.3*abs(i-255)+0.3*abs(j-420)
-cv.imshow("grey",img2)
-img3=cv.subtract(img1,img2)
-cv.imshow("test",img3)
-cv.imwrite("D:/opencv/gradual.png",img3)
-cv.waitKey(0)
-cv.destroyAllWindows()
-
-
-
-------------------------------------------------------------------
-
-马赛克
-
-
-import cv2 as cv
-import numpy as np
-
-img1=cv.imread("D:/opencv/test.jpg")
-cv.imshow("origin",img1)
-print("picture width"+str(img1.shape[1]))
-print("picture height"+str(img1.shape[0]))
-x=int(input("x position:"))
-y=int(input("y position:"))
-width=int(input("width:"))
-height=int(input("height:"))
-size=int(input("cell size"))
-if x+width>img1.shape[1] or y+height>img1.shape[0] or size>50:
-    print("wrong size")
-
-else:
-    for i in range(int(y/size),int((y+height)/size)):
-        for j in range(int(x/size),int((x+width)/size)):
-            img1[size*i:size*i+size,size*j:size*j+size]=img1[size*i,size*j]
-    cv.imshow("m",img1)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
-
-
--------------------------------------------------------------------
-
 摘取蓝色部分
 
 
@@ -81,48 +23,6 @@ while(True):
         break
 cv.destroyAllWindows()
 
-
-
-——————————————————————————————————
-不同模糊程度图像输出
-
-
-import cv2 as cv
-import numpy as np
-
-img=cv.imread("D:/opencv/testimage1.png")
-cv.imshow("origin",img)
-for i in range(1,11,1):
-    blur=cv.GaussianBlur(img,(2*i+1,2*i+1),0)
-    name="blur"+str(i)
-    cv.imshow(name,blur)
-
-cv.waitKey(0)
-cv.destroyAllWindows()
-
----------------------------------------------------------------
-
-直方图
-
-
-import cv2 as cv
-import numpy as np
-from matplotlib import pyplot
-
-img=cv.imread("D:/opencv/testimage1.png")
-cv.imshow("origin",img)
-color=("blue","green","red")
-for i in range(3):
-    hist=cv.calcHist([img],[i],None,[256],[0,256])
-    pyplot.plot(hist,color[i])
-    pyplot.xlim([0,256])
-pyplot.show()
-
-cv.waitKey(0)
-cv.destroyAllWindows()
-
-
--------------------------------------------------------------
 反向投影找目标
 
 import cv2 as cv
@@ -274,6 +174,226 @@ for i,contour in enumerate(con):
     cy=m['m01']/(m['m00']+0.001)
     
     cv.rectangle(img,(x,y),(x+w,y+h),(0,255,0),2)
-    cv.circle(img,(np.int(cx),np.int(cy)),3,(0,255,255),-1)
+    cv.circle(img,(np.int(cx),np.int(cy)),3,(0,255,0),-1)
 cv.imshow("result",img)
 cv.imwrite("D:/opencv/results/coin_find.png",img)
+
+————————————————————————————————————————————
+找西红柿
+
+import cv2 as cv
+import numpy as np
+
+
+img=cv.imread("D:/opencv/resource/tomato2.png")
+
+print(img.shape)
+res=cv.subtract(img[:,:,2],img[:,:,1])
+cv.imshow("res",res)
+
+
+ret,bina=cv.threshold(res,0,255,cv.THRESH_BINARY|cv.THRESH_OTSU)
+cv.imshow("bina",bina)
+
+
+k=cv.getStructuringElement(cv.MORPH_RECT,(15,15))
+bina=cv.morphologyEx(bina,cv.MORPH_OPEN,k)
+cv.imshow("open",bina)
+
+out,con,hir=cv.findContours(bina,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE)
+print(con)
+for i,contour in enumerate(con):
+    area=cv.contourArea(contour)
+    x,y,w,h=cv.boundingRect(contour)
+    print(x,y,h,w)
+    
+    m=cv.moments(contour)
+    cx=m['m10']/(m['m00']+0.001)
+    cy=m['m01']/(m['m00']+0.001)
+    
+    cv.rectangle(img,(x,y),(x+w,y+h),(0,255,0),2)
+    cv.circle(img,(np.int(cx),np.int(cy)),3,(0,255,0),-1)
+cv.imshow("result",img)
+cv.imwrite("D:/opencv/results/tomatos_found2.png",img)
+
+cv.waitKey(0)
+cv.destroyAllWindows()
+————————————————————————————————————————————————
+看电脑距离提醒
+
+import cv2 as cv
+import numpy as np
+
+video=cv.VideoCapture(0)
+det=cv.CascadeClassifier("D:/opencv/xmls/haarcascade_frontalface_default.xml")
+while(True):
+    ret,img=video.read()
+    img=cv.flip(img,1)
+    if_show=False
+    if ret==0:
+        break
+    gray=cv.cvtColor(img,cv.COLOR_BGR2GRAY)
+
+    faces=det.detectMultiScale(gray,1.2,5)
+    
+    for x,y,w,h in faces:
+        cv.rectangle(img,(x,y),(x+w,y+h),(0,0,255),5)
+        if w>250:
+            print(w)
+            if_show=True
+            text="get further from the screen!"
+            cv.putText(img,text,(x,y-40),cv.FONT_HERSHEY_SIMPLEX,1,(0,0,255),3)
+            break
+    if if_show==True:
+        cv.imshow("result",img)
+    key=cv.waitKey(5)
+    if key==27:
+        break
+
+video.release()
+cv.destroyAllWindows()
+
+————————————————————————————————————————————
+分类器训练（未成功）
+import cv2 as cv
+import numpy as np
+import matplotlib.pyplot
+
+pos_num=10
+neg_num=10
+
+wsize=(1280,720)
+bsize=(16,16)
+bstride=(8,8)
+csize=(8,8)
+nbin=9
+
+hog=cv.HOGDescriptor(wsize,bsize,bstride,csize,nbin)
+svm=cv.ml.SVM_create()
+
+f_num=int(((1280-16)/8+1)*((720-16)/8+1)*4*9)
+print(f_num)
+
+f_array=np.zeros(((pos_num+neg_num),f_num),np.float32)
+l_array=np.zeros(((pos_num+neg_num),1),np.int32)
+
+for i in range(pos_num):
+    name="D:/opencv/samps/pos/pos"+str(i+1)+".jpg"
+    img=cv.imread(name)
+    #print(img.shape)
+    hist=hog.compute(img,(8,8))
+    for j in range(0,f_num):
+        f_array[i,j]=hist[j]
+    l_array[i,0]=1
+    print(str(i)+"done")
+print("positive done")
+
+
+for i in range(neg_num):
+    name="D:/opencv/samps/neg/neg"+str(i+1)+".jpg"
+    img=cv.imread(name)
+    hist=hog.compute(img,(8,8))
+    for j in range(0,f_num):
+        f_array[i,j]=hist[j]
+    l_array[i,0]=-1
+    print(str(i)+"done")
+print("negative done")
+
+
+svm.setType(cv.ml.SVM_C_SVC)
+svm.setKernel(cv.ml.SVM_LINEAR)
+svm.setC(0.01)
+
+ret=svm.train(f_array,cv.ml.ROW_SAMPLE,l_array)
+
+a=np.zeros((1),np.float32)
+rho=svm.getDecisionFunction(0,a)
+print("rho"+str(rho))
+print("a"+str(a))
+a_array=np.zeros((1,1),np.float32)
+sv_array=np.zeros((1,f_num),np.float32)
+a_array[0,0]=a
+result_array=-1*a_array*sv_array
+print("result"+str(result_array))
+
+
+my_det=np.zeros((f_num+1),np.float32)
+for i in range(0,f_num):
+    my_det[i]=result_array[0,i]
+my_det[f_num]=rho[0]
+print(my_det)
+my_hog=cv.HOGDescriptor()
+my_hog.setSVMDetector(my_det)
+
+————————————————————————————————————————————————————
+基于角点检测方块
+
+import cv2 as cv
+import numpy as np
+
+vid=cv.VideoCapture("D:/opencv/resource/paper.mp4")
+while(True):
+    ret,img=vid.read()
+    if ret==0:
+        break
+        
+    gray=cv.cvtColor(img,cv.COLOR_BGR2GRAY)
+    gray=cv.GaussianBlur(gray,(0,0),5)
+    gray=np.float32(gray)
+
+    cor=cv.goodFeaturesToTrack(gray,6,0.01,10)
+    xs=[0,0,0,0,0,0]
+    ys=[0,0,0,0,0,0]
+    lable=0
+
+    for c in cor:
+    
+        x,y=c.ravel()
+        xs[lable]=x
+        ys[lable]=y
+        lable+=1
+        #print("x=",x,"y=",y)
+    
+    cv.rectangle(img,(min(xs),min(ys)),(max(xs),max(ys)),(0,0,255),5)
+    cv.imshow("corners",img)
+    k=cv.waitKey(1)
+    if k==27:
+        break
+cv.destroyAllWindows()
+
+——————————————————————————————————
+运动目标检测
+
+import cv2 as cv
+import numpy as np
+
+vid=cv.VideoCapture(0)
+bs=cv.createBackgroundSubtractorKNN(detectShadows=True)
+
+while(True):
+    ret,frame=vid.read()
+    fgmask=bs.apply(frame)
+    ret,bina=cv.threshold(fgmask,0,255,cv.THRESH_BINARY|cv.THRESH_OTSU)
+    cv.imshow("bina",bina)
+
+    k1=cv.getStructuringElement(cv.MORPH_RECT,(20,20))
+    k2=cv.getStructuringElement(cv.MORPH_RECT,(20,20))
+    bina=cv.morphologyEx(bina,cv.MORPH_CLOSE,k1)
+    #bina=cv.morphologyEx(bina,cv.MORPH_OPEN,k2)
+    cv.imshow("processed",bina)
+    
+    out,con,hir=cv.findContours(bina,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE)
+    for contour in con:
+        if cv.contourArea(contour)>1600:
+            (x,y,w,h)=cv.boundingRect(contour)
+            cv.rectangle(frame,(x,y),(x+w,y+h),(0,255,0),2)
+    cv.imshow("frame",frame)
+    k=cv.waitKey(1)
+    if k==27:
+        break
+
+
+vid.release()
+
+cv.destroyAllWindows()
+
